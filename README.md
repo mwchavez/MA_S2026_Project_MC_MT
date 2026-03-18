@@ -85,12 +85,12 @@ All samples are handled exclusively within the isolated analysis environment. No
 
 ## Authors
 
-- **[Your Name]** — [GitHub handle or institutional affiliation]
-- **[Partner Name]** — [GitHub handle or institutional affiliation]
+- **Moses Chavez** — @mwchavez
+- **Marissa Turner** — @marilturner
 
 ## Acknowledgments
 
-This project was developed as coursework for [Course Name: Malware Analysis], building upon prior work completed for Intrusion Detection Systems and Digital Forensics at [Institution].
+This project was developed as coursework for CSEC 4300: Malware Analysis, building upon prior work completed for CIS 3370: Intrusion Detection Systems and CIS 3345: Digital Forensics at University of the Incarnate Word.
 
 ## License
 
