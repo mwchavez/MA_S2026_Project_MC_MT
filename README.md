@@ -18,7 +18,7 @@ The lab runs on a Windows 11 desktop (32 GB RAM, 250+ GB available storage) usin
 |---|---|---|---|
 | **Security Onion** | Network sensor (Suricata IDS, Zeek NSM, Elasticsearch/Kibana) | 12 GB RAM, 200 GB disk | Management + Analysis (monitor) |
 | **REMnux** | Linux analysis workstation, INetSim (simulated DNS/HTTP/SMTP), static analysis tools, YARA | 4 GB RAM, 40 GB disk | Management + Analysis |
-| **Windows Detonation VM (FlareVM)** | Malware execution environment, dynamic and memory analysis | 8 GB RAM, 60 GB disk | Isolated Analysis |
+| **Windows Detonation VM** | Malware execution environment, dynamic and memory analysis | 8 GB RAM, 60 GB disk | Isolated Analysis |
  
 ### Network Topology
  
@@ -129,7 +129,6 @@ Synthesis of all findings into a behavioral summary, comprehensive IOC list (fil
 - **Zeek** — Network metadata generation and protocol logging
 - **YARA** — Pattern matching for file-level malware identification
 - **REMnux** — Linux-based malware analysis distribution
-- **FlareVM** — Windows-based malware analysis and reverse engineering environment
 - **INetSim** — Simulated internet services for safe dynamic analysis
 - **Ghidra** — NSA's open-source reverse engineering and disassembly framework
 - **x64dbg** — Open-source Windows debugger for dynamic binary analysis
