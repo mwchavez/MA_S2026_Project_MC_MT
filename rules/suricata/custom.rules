@@ -1,0 +1,253 @@
+# =============================================================================
+# Custom Suricata Rules — URSNIF (Gozi/ISFB) Detection
+# =============================================================================
+#
+# Authors: Moses Chavez (@mwchavez), Marissa Turner (@marilturner)
+# Course:  CSEC 4300 Malware Analysis
+# School:  University of the Incarnate Word
+# Date:    April 2026
+#
+# Reference: https://www.malware-traffic-analysis.net/2021/05/14/index.html
+# Sample:    2021-05-14 URSNIF infection PCAP
+#
+# Basis for detection:
+#   These rules are derived from network IOCs recovered from the Phase 4
+#   tshark analysis of the provided URSNIF infection PCAP and corroborated
+#   by the live detonation in the FlareVM detonation environment. Rules
+#   target the C2 domains, C2 IPs, payload-staging hosts, URI patterns,
+#   and browser-spoofing User-Agent strings observed in the URSNIF C2
+#   communication channel.
+#
+# SID space: 4300xxx (CSEC 4300 course namespace, custom rules)
+# Rev: all rules at rev:1 for initial release
+#
+# =============================================================================
+# CATEGORY 1 — DNS DETECTION
+# =============================================================================
+# These rules fire when an internal host queries DNS for a confirmed URSNIF
+# C2 or staging domain. DNS-based detection is high-fidelity (low false
+# positive rate) because the queried domains are confirmed malicious.
+# =============================================================================
+
+alert dns $HOME_NET any -> any any (msg:"CSEC4300 URSNIF DNS Query for C2 Domain (app.buboleinov.com)"; \
+    dns.query; content:"app.buboleinov.com"; nocase; isdataat:!1,relative; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity Critical; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300001; rev:1;)
+
+alert dns $HOME_NET any -> any any (msg:"CSEC4300 URSNIF DNS Query for C2 Domain (todo.faroin.at)"; \
+    dns.query; content:"todo.faroin.at"; nocase; isdataat:!1,relative; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity Critical; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300002; rev:1;)
+
+alert dns $HOME_NET any -> any any (msg:"CSEC4300 URSNIF DNS Query for Staging Server (docs.atu.ngr.mybluehost.me)"; \
+    dns.query; content:"docs.atu.ngr.mybluehost.me"; nocase; isdataat:!1,relative; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity High; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300003; rev:1;)
+
+# -----------------------------------------------------------------------------
+# Rule 4300004 — OpenDNS public-IP discovery (URSNIF behavioral fingerprint)
+# -----------------------------------------------------------------------------
+# URSNIF queries myip.opendns.com via OpenDNS resolvers (208.67.222.222) to
+# discover its public-facing IP. This is benign on its own (any host might
+# do this), but is a strong signal when correlated with other URSNIF
+# indicators. Use as a HIGH-context, LOW-confidence indicator — alert at
+# severity Medium and tune via correlation.
+# -----------------------------------------------------------------------------
+
+alert dns $HOME_NET any -> any any (msg:"CSEC4300 Possible URSNIF Public-IP Discovery (myip.opendns.com)"; \
+    dns.query; content:"myip.opendns.com"; nocase; isdataat:!1,relative; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity Medium; \
+    sid:4300004; rev:1;)
+
+
+# =============================================================================
+# CATEGORY 2 — IP-BASED DETECTION
+# =============================================================================
+# Outbound connections to confirmed URSNIF C2 / staging IP addresses.
+# Catches direct-IP fallback if DNS-based detection is bypassed.
+# =============================================================================
+
+alert ip $HOME_NET any -> 34.95.142.247 any (msg:"CSEC4300 URSNIF C2 Outbound Connection to Known C2 IP (34.95.142.247)"; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity Critical; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300010; rev:1;)
+
+alert ip $HOME_NET any -> 162.241.24.47 any (msg:"CSEC4300 URSNIF Outbound Connection to Known Staging Server IP (162.241.24.47)"; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity High; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300011; rev:1;)
+
+
+# =============================================================================
+# CATEGORY 3 — HTTP REQUEST DETECTION
+# =============================================================================
+# Catches URSNIF C2 HTTP traffic by URI pattern, host, and User-Agent.
+# Use these as fallback if DNS or IP rules miss (e.g., C2 infrastructure
+# rotates).
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Rule 4300020 — HTTP host header for app.buboleinov.com
+# -----------------------------------------------------------------------------
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"CSEC4300 URSNIF HTTP Request to C2 Host (app.buboleinov.com)"; \
+    flow:established,to_server; \
+    http.host; content:"app.buboleinov.com"; nocase; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity Critical; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300020; rev:1;)
+
+# -----------------------------------------------------------------------------
+# Rule 4300021 — HTTP host header for todo.faroin.at
+# -----------------------------------------------------------------------------
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"CSEC4300 URSNIF HTTP Request to C2 Host (todo.faroin.at)"; \
+    flow:established,to_server; \
+    http.host; content:"todo.faroin.at"; nocase; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity Critical; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300021; rev:1;)
+
+# -----------------------------------------------------------------------------
+# Rule 4300022 — Staging server payload download (presentation.dll)
+# -----------------------------------------------------------------------------
+# Catches the GET /presentation.dll request to the staging host. The
+# combination of host + URI is highly specific.
+# -----------------------------------------------------------------------------
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"CSEC4300 URSNIF Stage 2 Payload Download (presentation.dll)"; \
+    flow:established,to_server; \
+    http.method; content:"GET"; \
+    http.uri; content:"/presentation.dll"; nocase; \
+    http.host; content:"docs.atu.ngr.mybluehost.me"; nocase; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity Critical; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300022; rev:1;)
+
+# -----------------------------------------------------------------------------
+# Rule 4300023 — URSNIF C2 URI structural pattern (long base64-style path)
+# -----------------------------------------------------------------------------
+# URSNIF C2 traffic uses long URIs containing URL-safe base64 segments
+# separated by underscores and "_2B" / "_2F" sequences (URL-encoded "+" and
+# "/"). This rule catches the pattern structurally rather than matching
+# specific encoded strings, which provides resilience against C2 rotation.
+#
+# Threshold: minimum 60-character URI containing at least one "_2B" segment
+# AND at least one "_2F" segment, observed against an HTTP request method.
+# -----------------------------------------------------------------------------
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"CSEC4300 URSNIF C2 URI Pattern (long base64-style path with URL-encoded delimiters)"; \
+    flow:established,to_server; \
+    http.method; content:"GET"; \
+    http.uri; content:"/"; depth:1; \
+    http.uri; content:"_2B"; \
+    http.uri; content:"_2F"; \
+    http.uri; pcre:"/^\/[A-Za-z0-9_]{20,}/"; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity High; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300023; rev:1;)
+
+
+# =============================================================================
+# CATEGORY 4 — USER-AGENT DETECTION
+# =============================================================================
+# URSNIF spoofs browser User-Agent strings to mimic the user's real browser.
+# Two distinct UAs observed in the PCAP:
+#   - IE 11 spoof
+#   - Firefox 86 spoof (against the SAME C2 host)
+#
+# The use of multiple browser identities against a single destination is
+# itself a behavioral indicator. These rules catch the specific UA strings
+# in HTTP requests; combined with the host/IP rules above they provide
+# defense in depth.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Rule 4300030 — Specific Trident/7.0 IE 11 User-Agent observed in URSNIF C2
+# -----------------------------------------------------------------------------
+# Note: This UA is also used by legitimate IE 11 clients. Use this rule with
+# correlation against destination — alone it has high false positives, but
+# combined with the C2 host/IP rules it's a strong signal.
+# -----------------------------------------------------------------------------
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"CSEC4300 URSNIF C2 User-Agent (Trident/7.0 IE11 spoof) — Correlate with destination"; \
+    flow:established,to_server; \
+    http.user_agent; content:"Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko"; \
+    http.host; pcre:"/(buboleinov\.com|faroin\.at|mybluehost\.me)$/i"; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity High; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300030; rev:1;)
+
+# -----------------------------------------------------------------------------
+# Rule 4300031 — Firefox 86 spoof targeting URSNIF C2 hosts
+# -----------------------------------------------------------------------------
+alert http $HOME_NET any -> $EXTERNAL_NET any (msg:"CSEC4300 URSNIF C2 User-Agent (Firefox 86 spoof against URSNIF C2)"; \
+    flow:established,to_server; \
+    http.user_agent; content:"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0"; \
+    http.host; pcre:"/(buboleinov\.com|faroin\.at|mybluehost\.me)$/i"; \
+    classtype:trojan-activity; \
+    metadata:malware_family URSNIF, attack_target Client_Endpoint, signature_severity High; \
+    reference:url,malware-traffic-analysis.net/2021/05/14/index.html; \
+    sid:4300031; rev:1;)
+
+
+# =============================================================================
+# CATEGORY 5 — BEHAVIORAL CORRELATION
+# =============================================================================
+# These rules catch URSNIF behavior patterns that cross protocols.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Rule 4300040 — URSNIF C2 connectivity probe pattern
+# -----------------------------------------------------------------------------
+# URSNIF sequence: query api.msn.com (legitimate connectivity check), then
+# query the malicious C2 within seconds. Either query alone is benign; the
+# combination within a short window is suspicious. This rule fires when
+# api.msn.com is queried and tracks the host for follow-up — Phase 5
+# defensive recommendation: deploy as part of an alert correlation rule
+# in the SIEM rather than as a standalone IDS signature.
+#
+# Implementation note: this is a Suricata signature suitable for use AS-IS
+# at severity Informational; for full behavioral correlation, pair with a
+# SIEM rule (e.g., "host that queried api.msn.com AND queried any of [list]
+# within 60 seconds → escalate").
+# -----------------------------------------------------------------------------
+alert dns $HOME_NET any -> any any (msg:"CSEC4300 INFO URSNIF Connectivity-Check Domain Queried (api.msn.com) — correlate with subsequent C2 queries"; \
+    dns.query; content:"api.msn.com"; nocase; isdataat:!1,relative; \
+    classtype:not-suspicious; \
+    metadata:malware_family URSNIF, signature_severity Informational; \
+    sid:4300040; rev:1;)
+
+
+# =============================================================================
+# Tuning notes
+# =============================================================================
+# - Rules 4300001-4300003 (specific C2 domain DNS queries): deploy as Critical
+# - Rules 4300010-4300011 (specific C2 IP outbound connections): deploy as Critical
+# - Rules 4300020-4300022 (specific HTTP host/URI): deploy as Critical
+# - Rule 4300023 (URI structural pattern): may produce occasional false
+#   positives on legitimate base64-in-URL traffic. Tune by adding host/IP
+#   exclusions for known internal services that use long base64 URIs.
+# - Rules 4300030-4300031 (User-Agent spoofs): scoped via http.host pcre to
+#   reduce false positives — only fires when the spoof UA targets a known
+#   URSNIF C2 host.
+# - Rule 4300040 (api.msn.com): Informational by design; expect high volume,
+#   use only as input to a SIEM correlation rule.
+#
+# Verification:
+#   sudo suricata -T -c /etc/suricata/suricata.yaml -S custom.rules
+#   (validates rule syntax)
+#
+#   sudo so-import-pcap 2021-05-14-Ursnif-infection-traffic.pcap
+#   (replays the PCAP through Suricata; rules above should fire)
+#
+# =============================================================================

@@ -1,0 +1,315 @@
+{
+  "metadata": {
+    "report_title": "URSNIF (Gozi/ISFB) Infection — IOC Inventory",
+    "campaign_date": "2021-05-14",
+    "sample_source": "https://www.malware-traffic-analysis.net/2021/05/14/index.html",
+    "analysis_authors": [
+      "Moses Chavez (@mwchavez)",
+      "Marissa Turner (@marilturner)"
+    ],
+    "course": "CSEC 4300 — Malware Analysis",
+    "institution": "University of the Incarnate Word",
+    "report_date": "2026-04-28",
+    "schema_note": "Custom schema for academic deliverable. Loosely aligned with STIX 2.1 indicator categorization; not strictly STIX-compliant."
+  },
+
+  "kill_chain_summary": {
+    "delivery": "Phishing email (.eml) with .xlsb attachment",
+    "exploitation": "User opens .xlsb and enables macros; XLM auto_open formula at $BA$13 fires",
+    "installation": "Macro retrieves intermediate JavaScript droppers (Fattura.js → lista.js) which fetch and execute block.dll via rundll32",
+    "command_and_control": "block.dll establishes outbound HTTP(S) C2 to app.buboleinov.com (34.95.142.247) with encoded URI payloads",
+    "actions_on_objectives": "Banking trojan operations: browser hooking, form grabbing, credential exfiltration via encoded HTTP URIs"
+  },
+
+  "file_indicators": [
+    {
+      "category": "phishing_email",
+      "filename": "2021-05-03-malspam-pushing-Ursnif.eml",
+      "file_size_bytes": 134798,
+      "md5": "3ecaacac670c10e573f81aef38ee1a05",
+      "sha256": "5e2cbd4b03acc2d0fcb3764fda7f8b831fe9c0c441667a11ab1ee298869594e6",
+      "kill_chain_phase": "delivery",
+      "description": "Original phishing email with malicious .xlsb attachment; spoofed reply thread, SPF FAIL, MailBee.NET X-Mailer, default Windows Message-ID host."
+    },
+    {
+      "category": "dropper",
+      "filename": "I8m7XluZbbj10J53.xlsb",
+      "file_size_bytes": 96582,
+      "md5": "eb6e605d7d61d17694a6bb3c72ef04c0",
+      "sha256": "60f0eb98765e693f80626a8ce9a80937036b480dffc2a65eca55fbc7ccc94d18",
+      "kill_chain_phase": "exploitation",
+      "description": "Excel Binary Workbook with XLM (Excel 4.0) macros auto_open at cell $BA$13; uses random-character function names (DFJDFJDF, FDJDFJKERJKJKER) to defeat automated deobfuscation; DocuSign-themed lure."
+    },
+    {
+      "category": "core_payload",
+      "filename": "block.dll",
+      "internal_name": "How.dll",
+      "file_size_bytes": 312832,
+      "md5": "5a7c87dab250cee78ce63ac34117012b",
+      "sha1": "554c4ccf2341182768d475087d8a8bcfaa525a12",
+      "sha256": "8a26c32848c9ea085505359f67927d1a744ec07303ed0013e592eca6b4df4790",
+      "compile_timestamp": "2021-04-08T00:05:51Z",
+      "compiler": "Microsoft Visual C/C++ 15.00.21022 (Visual Studio 2008)",
+      "linker": "Microsoft Linker 9.00.21022",
+      "pdb_path": "c:\\Whether\\class\\156\\Through\\How.pdb",
+      "pdb_guid": "C73B28130056411D84ED718996F219E04",
+      "exports": ["Pape1", "Riverslow"],
+      "execution_command": "rundll32.exe block.dll,Pape1",
+      "kill_chain_phase": "installation",
+      "description": "Core URSNIF DLL payload. 32-bit i386 PE DLL. Statically linked MSVC CRT. Dynamic API resolution via GetProcAddress (15+ COMPUTED_CALL sites). Custom obfuscated arithmetic key derivation in FUN_0103320c (called from Pape1). No commercial packer; runtime decryption of all strings/config."
+    },
+    {
+      "category": "secondary_payload",
+      "filename": "presentation.dll",
+      "url": "http://docs.atu.ngr.mybluehost.me/presentation.dll",
+      "kill_chain_phase": "installation",
+      "description": "Secondary stage payload downloaded by URSNIF from staging server. Hash not available in lab (URSNIF could not establish C2 due to DNS sinkhole limitation in lab environment)."
+    }
+  ],
+
+  "network_indicators": {
+    "c2_domains": [
+      {
+        "domain": "app.buboleinov.com",
+        "role": "primary_c2",
+        "confidence": "confirmed",
+        "observation_sources": ["live_detonation", "provided_pcap"],
+        "first_observed": "2021-05-14",
+        "description": "Primary URSNIF C2 endpoint. Confirmed by both live detonation in the FlareVM lab and the provided PCAP."
+      },
+      {
+        "domain": "todo.faroin.at",
+        "role": "secondary_c2",
+        "confidence": "confirmed",
+        "observation_sources": ["provided_pcap"],
+        "first_observed": "2021-05-14",
+        "description": "Secondary C2 host. Receives encoded URI payloads (likely exfiltration channel)."
+      },
+      {
+        "domain": "docs.atu.ngr.mybluehost.me",
+        "role": "staging_server",
+        "confidence": "confirmed",
+        "observation_sources": ["provided_pcap"],
+        "first_observed": "2021-05-14",
+        "description": "Staging host that serves /presentation.dll (secondary stage payload)."
+      }
+    ],
+
+    "behavioral_dns_indicators": [
+      {
+        "domain": "api.msn.com",
+        "role": "connectivity_check",
+        "confidence": "behavioral_fingerprint",
+        "description": "Legitimate Microsoft service queried by URSNIF as a 'do I have internet' check before attempting C2. NOT a malicious indicator on its own; useful as a behavioral correlation signal."
+      },
+      {
+        "domain": "go.microsoft.com",
+        "role": "connectivity_check",
+        "confidence": "behavioral_fingerprint",
+        "description": "Secondary Microsoft connectivity check. Same caveat as api.msn.com."
+      },
+      {
+        "domain": "myip.opendns.com",
+        "role": "public_ip_discovery",
+        "confidence": "behavioral_fingerprint",
+        "description": "URSNIF queries this via OpenDNS to discover its public-facing IP (anti-NAT detection)."
+      },
+      {
+        "domain": "resolver1.opendns.com",
+        "role": "public_ip_discovery",
+        "confidence": "behavioral_fingerprint",
+        "description": "OpenDNS resolver used for myip.opendns.com query."
+      }
+    ],
+
+    "c2_ip_addresses": [
+      {
+        "ip": "34.95.142.247",
+        "role": "primary_c2",
+        "asn_owner": "Google Cloud",
+        "description": "Primary URSNIF C2. Hosted on Google Cloud — common URSNIF tactic to use cloud reputation for IP-reputation evasion."
+      },
+      {
+        "ip": "162.241.24.47",
+        "role": "staging_server",
+        "asn_owner": "Unified Layer / Bluehost",
+        "description": "Staging server IP. Serves /presentation.dll."
+      }
+    ],
+
+    "benign_referenced_ips": [
+      {
+        "ip": "208.67.222.222",
+        "role": "opendns_public_resolver",
+        "description": "OpenDNS public DNS resolver. Used by URSNIF for myip.opendns.com query. Not malicious; not actionable."
+      }
+    ],
+
+    "http_uri_patterns": [
+      {
+        "pattern": "/presentation.dll",
+        "method": "GET",
+        "host_context": "docs.atu.ngr.mybluehost.me",
+        "description": "Secondary stage payload download from staging server."
+      },
+      {
+        "pattern": "/[A-Za-z0-9_]{20,}_2B[A-Za-z0-9_]+_2F[A-Za-z0-9_]+",
+        "method": "GET",
+        "host_context": "app.buboleinov.com, todo.faroin.at",
+        "description": "URSNIF C2 communication URI structure. Long URL-safe-base64-style segments separated by URL-encoded delimiters (_2B = '+', _2F = '/'). Carries encrypted C2 payload (config request, beacon, exfiltration)."
+      },
+      {
+        "pattern": "/favicon.ico",
+        "method": "GET",
+        "host_context": "app.buboleinov.com",
+        "description": "Cover-traffic requests interspersed with C2 communication. Mimics normal browser behavior."
+      }
+    ],
+
+    "user_agent_strings": [
+      {
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko",
+        "spoof_target": "Internet Explorer 11",
+        "description": "URSNIF C2 traffic spoofs IE 11. Note: also used by legitimate IE 11 clients; correlate with destination host."
+      },
+      {
+        "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:86.0) Gecko/20100101 Firefox/86.0",
+        "spoof_target": "Firefox 86",
+        "description": "URSNIF C2 traffic spoofs Firefox 86. Observed against the same C2 host as the IE 11 spoof — multiple browser identities from a single host is a behavioral fingerprint."
+      }
+    ]
+  },
+
+  "host_indicators": {
+    "process_indicators": [
+      {
+        "process_name": "rundll32.exe",
+        "command_line_argument": "block.dll,Pape1",
+        "description": "URSNIF execution command. Pape1 is a non-standard DLL export name and any rundll32 invocation targeting a non-system DLL with non-standard exports should be treated as suspicious."
+      },
+      {
+        "process_pattern": "rundll32.exe spawning rundll32.exe child, both subsequently exiting",
+        "description": "URSNIF self-spawn-and-exit pattern observed in detonation. Indicates process injection into a benign host process followed by loader cleanup."
+      }
+    ],
+
+    "registry_recon_targets": [
+      "HKLM\\SOFTWARE\\Microsoft\\Ole",
+      "HKLM\\SOFTWARE\\Microsoft\\OLE\\Aggregate*",
+      "HKCR\\WOW6432Node\\CLSID\\{*}",
+      "HKLM\\System\\CurrentControlSet\\Control\\*"
+    ],
+
+    "registry_persistence_observations": {
+      "persistence_keys_written_during_lab_detonation": "none",
+      "note": "URSNIF made zero RegSetValue operations during 5-minute lab detonation. This is consistent with URSNIF's documented memory-resident execution model. Real-world infections may differ if URSNIF migrates into a process with persistence requirements or operates over longer dwell times."
+    },
+
+    "filesystem_observations": {
+      "files_written_during_lab_detonation": "none",
+      "note": "URSNIF made zero WriteFile operations during 5-minute lab detonation. Memory-resident operating model confirmed."
+    }
+  },
+
+  "static_indicators": {
+    "yara_rules_authored": [
+      {
+        "rule_name": "URSNIF_block_dll_2021_05_14",
+        "rule_file": "rules/yara/ursnif-dll.yar",
+        "matches_against": "block.dll",
+        "match_basis": "PDB path, distinctive export combination (Pape1+Riverslow), debug GUID"
+      },
+      {
+        "rule_name": "URSNIF_heuristic_section_unpacking",
+        "rule_file": "rules/yara/ursnif-dll.yar",
+        "matches_against": "Generic — any PE with section vsize 16x or more larger than raw size",
+        "match_basis": "Heuristic for runtime unpacking buffer pattern"
+      },
+      {
+        "rule_name": "URSNIF_xlsb_dropper_2021_05_14",
+        "rule_file": "rules/yara/ursnif-dropper.yar",
+        "matches_against": "I8m7XluZbbj10J53.xlsb (raw .xlsb)",
+        "match_basis": "ZIP central directory filename entries (xl/xld/, xldsheet, binaryIndex)"
+      },
+      {
+        "rule_name": "URSNIF_xlsb_unzipped_xlm_content",
+        "rule_file": "rules/yara/ursnif-dropper.yar",
+        "matches_against": "Files extracted from the .xlsb container",
+        "match_basis": "Obfuscated XLM function identifiers + DocuSign-themed lure strings"
+      }
+    ]
+  },
+
+  "mitre_attack_mapping": [
+    {
+      "tactic": "Initial Access",
+      "technique": "T1566.001 — Phishing: Spearphishing Attachment",
+      "evidence": "Malspam email with .xlsb attachment delivered the infection."
+    },
+    {
+      "tactic": "Execution",
+      "technique": "T1059.005 — Command and Scripting Interpreter: Visual Basic / Excel 4.0 Macros",
+      "evidence": "XLM auto_open formula at cell $BA$13 in I8m7XluZbbj10J53.xlsb."
+    },
+    {
+      "tactic": "Execution",
+      "technique": "T1218.011 — System Binary Proxy Execution: Rundll32",
+      "evidence": "block.dll executed via rundll32.exe with non-standard export Pape1."
+    },
+    {
+      "tactic": "Execution",
+      "technique": "T1129 — Shared Modules",
+      "evidence": "capa identified Shared Modules technique; runtime DLL loading via LoadLibraryA."
+    },
+    {
+      "tactic": "Defense Evasion",
+      "technique": "T1027 — Obfuscated Files or Information",
+      "evidence": "block.dll uses inline runtime decryption with custom obfuscated arithmetic (FUN_0103320c). XLSB uses random-character XLM function names."
+    },
+    {
+      "tactic": "Defense Evasion",
+      "technique": "T1027.007 — Dynamic API Resolution",
+      "evidence": "block.dll has 15+ GetProcAddress COMPUTED_CALL sites; minimal name-based imports; capa flagged 'link many functions at runtime'."
+    },
+    {
+      "tactic": "Defense Evasion",
+      "technique": "T1055 — Process Injection",
+      "evidence": "rundll32.exe self-spawn-and-exit pattern observed; capa identified 'execute shellcode via indirect call'."
+    },
+    {
+      "tactic": "Defense Evasion",
+      "technique": "T1622 — Debugger Evasion",
+      "evidence": "block.dll imports IsDebuggerPresent."
+    },
+    {
+      "tactic": "Discovery",
+      "technique": "T1614 — System Location Discovery",
+      "evidence": "capa identified geographical-location capability; .data section contains country-name strings (united-states, united-kingdom, trinidad & tobago)."
+    },
+    {
+      "tactic": "Discovery",
+      "technique": "T1083 — File and Directory Discovery",
+      "evidence": "Rapid QueryDirectory operations against C:\\Windows\\System32 observed during detonation."
+    },
+    {
+      "tactic": "Discovery",
+      "technique": "T1012 — Query Registry",
+      "evidence": "Sequential RegOpenKey/RegQueryKey on COM/OLE registry tree (HKCR\\WOW6432Node\\CLSID\\)."
+    },
+    {
+      "tactic": "Command and Control",
+      "technique": "T1071.001 — Application Layer Protocol: Web Protocols",
+      "evidence": "HTTP-based C2 to app.buboleinov.com, todo.faroin.at via long encoded GET URIs."
+    },
+    {
+      "tactic": "Command and Control",
+      "technique": "T1102 — Web Service",
+      "evidence": "Uses api.msn.com, go.microsoft.com for connectivity checks; uses myip.opendns.com for public-IP discovery."
+    },
+    {
+      "tactic": "Command and Control",
+      "technique": "T1583.006 — Acquire Infrastructure: Web Services",
+      "evidence": "Primary C2 hosted on Google Cloud (34.95.142.247); staging server hosted on Bluehost (162.241.24.47). Uses cloud-reputation services for evasion."
+    }
+  ]
+}
