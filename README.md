@@ -18,7 +18,7 @@ The lab runs on a Windows 11 desktop (32 GB RAM, 250+ GB available storage) usin
 |---|---|---|---|
 | **Security Onion** | Network sensor (Suricata IDS, Zeek NSM, Elasticsearch/Kibana) | 12 GB RAM, 200 GB disk | Management + Analysis (monitor) |
 | **REMnux** | Linux analysis workstation, INetSim (simulated DNS/HTTP/SMTP), static analysis tools, YARA | 4 GB RAM, 40 GB disk | Management + Analysis |
-| **Windows Detonation VM** | Malware execution environment, dynamic and memory analysis | 8 GB RAM, 60 GB disk | Isolated Analysis |
+| **Windows Detonation VM** | Malware execution environment, dynamic and memory analysis | 8 GB RAM, 80 GB disk | Isolated Analysis |
  
 ### Network Topology
  
@@ -38,6 +38,8 @@ The following isolation and safety measures are enforced at all times:
 - **No USB passthrough** — USB controllers are disabled on the detonation VM
 - **Snapshot before every detonation** — The detonation VM is reverted to a clean snapshot after each analysis run
 - **Malware handling** — All samples are stored exclusively within the isolated analysis environment; no malware binaries are committed to this repository
+- **No internet access on the detonation VM, ever** — All analysis tools were installed on the Windows detonation VM via a read-only mounted ISO (built on the host from individually verified tool downloads), rather than via internet-dependent installers such as the FlareVM Boxstarter script. The detonation VM has never had a network path to the internet
+- **Security Onion deployment posture** — Security Onion is deployed in EVAL mode with airgap enabled. EVAL was selected over STANDALONE because the latter requires a 16 GB RAM allocation; EVAL provides the same Suricata, Zeek, Elasticsearch, and Kibana components within the lab's resource budget. Airgap mode is appropriate for an academic lab and is consistent with the no-internet posture of the analysis network
  
 ## Malware Sample: URSNIF (Gozi/ISFB)
  
@@ -54,7 +56,7 @@ The sample set is sourced from [malware-traffic-analysis.net](https://www.malwar
 | Artifact | Description | Analysis Role |
 |---|---|---|
 | `2021-05-03-malspam-pushing-Ursnif.eml` | Original phishing email (initial access vector) | Kill chain mapping, social engineering analysis |
-| `l8m7XluZbbj10J53.xlsb` | Excel Binary Workbook with embedded macros (first-stage dropper) | Static analysis (macro inspection), Phase 2 & 3 |
+| `I8m7XluZbbj10J53.xlsb` | Excel Binary Workbook with embedded macros (first-stage dropper) | Static analysis (macro inspection), Phase 2 & 3 |
 | `block.dll` | URSNIF DLL payload (core malware) | Static analysis (PE headers, imports, strings), assembly-level disassembly, dynamic execution, memory analysis |
 | `2021-05-14-Ursnif-infection-traffic.pcap` | Full packet capture of infection traffic | Network behavior analysis, Suricata/Zeek detection, C2 identification |
 | `2021-05-14-IOCs-for-Ursnif-infection.txt` | Pre-documented indicators of compromise | Validation and cross-reference for Phase 5 |
@@ -82,7 +84,7 @@ Construction of the isolated three-VM lab environment, installation and configur
 Extraction of file hashes (MD5, SHA-256), strings analysis, file format inspection (PE headers, import tables, section entropy for the DLL; macro extraction for the XLSB), and YARA rule matching against known URSNIF signatures.
  
 ### Phase 3: Assembly-Level Code Analysis
-Disassembly of `block.dll` using Ghidra and/or x64dbg. Identification and documentation of meaningful code regions including loops, conditional branches, API resolution techniques, and any obfuscation or packing indicators.
+Disassembly of `block.dll` using Ghidra 12.0.4. Identification and documentation of meaningful code regions including loops, conditional branches, API resolution techniques, and any obfuscation or packing indicators. Detect It Easy (DIE) is used for compiler/linker fingerprinting and entropy-based packer detection. Ghidra 12 includes an integrated debugger; x64dbg was evaluated for inclusion and excluded after VirusTotal flagged the official binary at 3/67 detections (one of which named a specific malware family) — documented as a deliberate tool-exclusion decision in the analysis methodology.
  
 ### Phase 4: Dynamic and Memory Analysis
 Controlled execution of the infection chain within the Windows detonation VM. Observation of runtime behavior including process creation, loaded modules, file system and registry modifications, and memory-resident artifacts. Network traffic captured and analyzed via Security Onion (Suricata alerts, Zeek logs).
@@ -130,13 +132,17 @@ Synthesis of all findings into a behavioral summary, comprehensive IOC list (fil
 - **YARA** — Pattern matching for file-level malware identification
 - **REMnux** — Linux-based malware analysis distribution
 - **INetSim** — Simulated internet services for safe dynamic analysis
-- **Ghidra** — NSA's open-source reverse engineering and disassembly framework
-- **x64dbg** — Open-source Windows debugger for dynamic binary analysis
+- **Ghidra 12.0.4** — NSA's open-source reverse engineering and disassembly framework (includes integrated debugger)
+- **Detect It Easy (DIE)** — PE compiler/linker fingerprinting, packer detection, and entropy analysis
 - **Wireshark** — Network protocol analyzer
 - **olevba / oletools** — Office document and macro analysis utilities
+- **XLMMacroDeobfuscator** — Excel 4.0 (XLM) macro deobfuscation for `.xlsb` dropper analysis
 - **PEStudio / PE-bear** — Portable Executable inspection tools
+- **rabin2 (radare2)** — Command-line PE inspection used for Phase 2 static analysis on REMnux
+- **capa** — Capability detection mapped to MITRE ATT&CK
+- **tshark** — Command-line PCAP analysis
 - **Process Monitor / Process Explorer** — Sysinternals runtime behavior monitoring
-- **Volatility** — Memory forensics framework
+- **Volatility** — Memory forensics framework (memory dump preserved for offline analysis)
 ## Authors
 
 - **Moses Chavez** — @mwchavez
